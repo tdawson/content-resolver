@@ -43,6 +43,15 @@ def _generate_html_page(template_name, template_data, page_name, settings):
         filename=filename
     ))
 
+    log("  settings...  ({settings})".format(
+        settings=settings
+    ))
+
+    log(" template_data...  ({template_data})".format(
+        template_data=template_data
+    ))
+
+
     file_path = os.path.join(output, filename)
     dump_data(file_path, template_data)
 
