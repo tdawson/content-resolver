@@ -34,6 +34,19 @@ def _generate_html_page(template_name, template_data, page_name, settings):
         file.write(page)
     
     log("  Done!")
+
+    filename = ("{page_name}.json".format(
+        page_name=page_name.replace(":", "--")
+    ))
+
+    log("  Writing file...  ({filename})".format(
+        filename=filename
+    ))
+
+    file_path = os.path.join(output, filename)
+    dump_data(file_path, data)
+
+    log("  Done!")
     log("")
 
 
