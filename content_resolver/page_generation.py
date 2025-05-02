@@ -1,6 +1,7 @@
 import os
 import subprocess
 import jinja2
+from content_resolver.data_generation import _generate_json_file
 from content_resolver.utils import dump_data, log
 
 
@@ -33,28 +34,6 @@ def _generate_html_page(template_name, template_data, page_name, settings):
     with open(os.path.join(output, filename), "w") as file:
         file.write(page)
     
-    log("  Done!")
-
-    filename = ("{page_name}.json".format(
-        page_name=page_name.replace(":", "--")
-    ))
-
-    log("  Writing file...  ({filename})".format(
-        filename=filename
-    ))
-
-    log("  settings...  ({settings})".format(
-        settings=settings
-    ))
-
-    log(" template_data...  ({template_data})".format(
-        template_data=template_data
-    ))
-
-
-    file_path = os.path.join(output, filename)
-    dump_data(file_path, template_data)
-
     log("  Done!")
     log("")
 
@@ -501,7 +480,8 @@ def _generate_view_pages(query):
                 pkg_name=pkg_name
             )
             _generate_html_page("view_rpm", template_data, page_name, query.settings)
-        
+            _generate_json_file(pkg, page_name, query.settings)
+
 
         # Generate the SRPM pages
         for srpm_name, srpm in view_all_arches["source_pkgs_by_name"].items():
@@ -517,6 +497,7 @@ def _generate_view_pages(query):
                 srpm_name=srpm_name
             )
             _generate_html_page("view_srpm", template_data, page_name, query.settings)
+            _generate_json_file(srpm, page_name, query.settings)
 
 
 

@@ -28,12 +28,12 @@ mkdir -p $WORK_DIR/content-resolver/out/history || exit 1
 
 # Get a copy of the historic data
 # aws s3 sync s3://tiny.distro.builders/history $WORK_DIR/content-resolver/out/history --exclude "*" --include="historic_data*" || exit 1
-# rsync -aH $SAVE_DIR/out/history $WORK_DIR/content-resolver/out/history --exclude "*" --include="historic_data*" || exit 1
+rsync -aH $SAVE_DIR/out/history $WORK_DIR/content-resolver/out/history --exclude "*" --include="historic_data*" || exit 1
 
 # Get the root log cache
 # (there's no exit one because that file might not exist)
 # aws s3 cp s3://tiny.distro.builders/cache_root_log_deps.json $WORK_DIR/content-resolver/cache_root_log_deps.json
-# cp $SAVE_DIR/out/cache_root_log_deps.json $WORK_DIR/content-resolver/cache_root_log_deps.json
+cp $SAVE_DIR/out/cache_root_log_deps.json $WORK_DIR/content-resolver/cache_root_log_deps.json
 
 # Build the site
 build_started=$(date +"%Y-%m-%d-%H%M")
