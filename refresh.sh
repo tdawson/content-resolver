@@ -18,7 +18,8 @@ mkdir -p $SAVE_DIR/{out,cache,history}
 cd $WORK_DIR
 
 # Get the latest code repo and configs
-git clone https://github.com/minimization/content-resolver || exit 1
+#git clone https://github.com/minimization/content-resolver || exit 1
+git clone -b package-json git@github.com:tdawson/content-resolver.git || exit 1
 cd content-resolver || exit 1
 #git clone https://github.com/minimization/content-resolver-input || exit 1
 
