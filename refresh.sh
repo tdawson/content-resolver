@@ -6,14 +6,14 @@
 # podman build -t localhost/asamalik/fedora-env .
 
 WORK_DIR=$(mktemp -d -t content-resolver-XXXXXXXXXX)
-SAVE_DIR="~/tmp/cr"
+SAVE_DIR="/home/tdawson/tmp/cr"
 
 if [[ ! "$WORK_DIR" || ! -d "$WORK_DIR" ]]; then
   echo "Could not create temp dir"
   exit 1
 fi
 
-mkdir -p $SAVE_DIR/{out,cache,history}
+mkdir -p $SAVE_DIR/{out,cache,history,logs}
 
 cd $WORK_DIR
 
@@ -40,9 +40,9 @@ build_started=$(date +"%Y-%m-%d-%H%M")
 echo ""
 echo "Building..."
 echo "$build_started"
-echo "(Logging into ~/logs/$build_started.log)"
+echo "(Logging into $SAVE_DIR/logs/$build_started.log)"
 CMD="./content_resolver.py --dnf-cache-dir /dnf_cachedir test_configs out" || exit 1
-podman run --rm -it --tmpfs /dnf_cachedir -v $WORK_DIR/content-resolver:/workspace:z localhost/asamalik/fedora-env $CMD > ~/logs/$build_started.log || exit 1
+podman run --rm -it --tmpfs /dnf_cachedir -v $WORK_DIR/content-resolver:/workspace:z localhost/asamalik/fedora-env $CMD > $SAVE_DIR/logs/$build_started.log || exit 1
 
 # Save the root log cache
 cp $WORK_DIR/content-resolver/cache_root_log_deps.json $WORK_DIR/content-resolver/out/cache_root_log_deps.json || exit 1
