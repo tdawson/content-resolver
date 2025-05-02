@@ -44,7 +44,7 @@ def _generate_html_page(template_name, template_data, page_name, settings):
     ))
 
     file_path = os.path.join(output, filename)
-    dump_data(file_path, data)
+    dump_data(file_path, template_data)
 
     log("  Done!")
     log("")
