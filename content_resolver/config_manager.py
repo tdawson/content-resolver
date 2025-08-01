@@ -23,6 +23,7 @@ class ConfigManager:
         parser.add_argument("--use-cache", dest="use_cache", action='store_true', help="Use local data instead of pulling Content Resolver. Saves a lot of time! Needs a 'cache_data.json' file at the same location as the script is at.")
         parser.add_argument("--dev-buildroot", dest="dev_buildroot", action='store_true', help="Buildroot grows pretty quickly. Use a fake one for development.")
         parser.add_argument("--dnf-cache-dir", dest="dnf_cache_dir_override", help="Override the dnf cache_dir.")
+        parser.add_argument("--parallel-root-logs", dest="parallel_root_logs", action='store_true', help="Process root.log files in parallel using ProcessPoolExecutor (faster but uses more memory).")
         args = parser.parse_args()
 
         settings["configs"] = args.configs
@@ -30,6 +31,7 @@ class ConfigManager:
         settings["use_cache"] = args.use_cache
         settings["dev_buildroot"] = args.dev_buildroot
         settings["dnf_cache_dir_override"] = args.dnf_cache_dir_override
+        settings["parallel_root_logs"] = args.parallel_root_logs
 
         settings["root_log_deps_cache_path"] = "cache_root_log_deps.json"
 
