@@ -53,12 +53,8 @@ def _get_build_deps_from_a_root_log_standalone(root_log):
             # DNF5 does this after "Repositories loaded" and quotes the NVR;
             # DNF4 does this before "Dependencies resolved" without the quotes.
             if "is already installed." in file_line:
-                # Format: "Package bash-5.1.0-1.fc34.x86_64 is already installed."
-                words = file_line.split()
-                if len(words) >= 4 and words[0] == "Package" and words[-2] == "already":
-                    pkg_nevr = words[1].strip('"')
-                    pkg_name = pkg_nevr.rsplit("-", 2)[0]
-                    required_pkgs.append(pkg_name)
+                pkg_name = file_line.split()[3].strip('"').rsplit("-",2)[0]
+                required_pkgs.append(pkg_name)
 
             # That's all! Next state! (DNF4)
             elif "Dependencies resolved." in file_line:
@@ -79,13 +75,9 @@ def _get_build_deps_from_a_root_log_standalone(root_log):
             # DNF5 does this after "Repositories loaded" and quotes the NVR, but
             # sometimes prints this in the middle of a dependency line.
             if "is already installed." in file_line:
-                words = file_line.split()
-                if "already" in words and len(words) >= 4:
-                    pkg_index = words.index("already") - 2
-                    if pkg_index >= 0:
-                        pkg_nevr = words[pkg_index].strip('"')
-                        pkg_name = pkg_nevr.rsplit("-", 2)[0]
-                        required_pkgs.append(pkg_name)
+                pkg_index = file_line.split().index("already") - 2
+                pkg_name = file_line.split()[pkg_index].strip('"').rsplit("-",2)[0]
+                required_pkgs.append(pkg_name)
 
             # The next line will be the first package. Next state!
             # DNF5 reports "Installing: ## packages" in the Transaction Summary,
@@ -173,7 +165,6 @@ def _get_build_deps_from_a_root_log_standalone(root_log):
                         required_pkgs.append(pkg_name)
 
                 else:
-                    from content_resolver.exceptions import KojiRootLogError
                     raise KojiRootLogError
         
 
@@ -202,7 +193,6 @@ def _download_root_log_with_retry(root_log_url):
         except Exception:
             attempts += 1
             if attempts == MAX_TRIES:
-                from content_resolver.exceptions import KojiRootLogError
                 raise KojiRootLogError(f"Could not download root.log from {root_log_url}")
             time.sleep(1)
 
@@ -223,7 +213,6 @@ def _get_koji_log_path_standalone(srpm_id, arch, koji_session):
         except Exception:
             attempts += 1
             if attempts == MAX_TRIES:
-                from content_resolver.exceptions import KojiRootLogError
                 raise KojiRootLogError("Could not talk to Koji API")
             time.sleep(1)
 
