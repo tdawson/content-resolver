@@ -1551,6 +1551,14 @@ class Analyzer():
         pkg["in_buildroot_of_srpm_id_dep"] = set()
         pkg["in_buildroot_of_srpm_id_env"] = set()
 
+        # Enhanced tracking for view-aware build dependency filtering
+        pkg["in_base_view_workload_ids_req"] = set()     # Required by base view workloads
+        pkg["in_base_view_workload_ids_dep"] = set()     # Dependencies of base view workloads
+        pkg["in_addon_view_workload_ids_req"] = set()    # Required by addon view workloads
+        pkg["in_addon_view_workload_ids_dep"] = set()    # Dependencies of addon view workloads
+        pkg["in_buildroot_of_base_view_srpm_ids"] = set()   # Build deps for base view packages
+        pkg["in_buildroot_of_addon_view_srpm_ids"] = set()  # Build deps for addon view packages
+
         pkg["unwanted_completely_in_list_ids"] = set()
         pkg["unwanted_buildroot_in_list_ids"] = set()
 
@@ -1604,6 +1612,14 @@ class Analyzer():
         srpm["in_buildroot_of_srpm_id_dep"] = set()
         srpm["in_buildroot_of_srpm_id_env"] = set()
 
+        # Enhanced tracking for view-aware build dependency filtering
+        srpm["in_base_view_workload_ids_req"] = set()     # Required by base view workloads
+        srpm["in_base_view_workload_ids_dep"] = set()     # Dependencies of base view workloads
+        srpm["in_addon_view_workload_ids_req"] = set()    # Required by addon view workloads
+        srpm["in_addon_view_workload_ids_dep"] = set()    # Dependencies of addon view workloads
+        srpm["in_buildroot_of_base_view_srpm_ids"] = set()   # Build deps for base view packages
+        srpm["in_buildroot_of_addon_view_srpm_ids"] = set()  # Build deps for addon view packages
+
         srpm["unwanted_completely_in_list_ids"] = set()
         srpm["unwanted_buildroot_in_list_ids"] = set()
 
@@ -1627,6 +1643,94 @@ class Analyzer():
             })
 
         return srpm
+
+
+    def _is_workload_from_base_view(self, workload_id, current_view_conf, views):
+        """
+        Determine if a workload belongs to the base view for the current addon view.
+
+        Args:
+            workload_id: The workload ID to check
+            current_view_conf: Configuration of the current view being analyzed
+            views: All analyzed views (for base view lookup)
+
+        Returns:
+            bool: True if the workload is from the base view, False otherwise
+        """
+        # If current view is not an addon, no base view exists
+        if current_view_conf.get("type") != "addon":
+            return False
+
+        # Get the base view ID and arch from the workload
+        base_view_id = current_view_conf["base_view_id"]
+        workload_arch = workload_id.split(":")[-1]  # Extract arch from workload_id
+        base_view_key = f"{base_view_id}:{workload_arch}"
+
+        # Check if the workload exists in the base view
+        if base_view_key in views and "workload_ids" in views[base_view_key]:
+            return workload_id in views[base_view_key]["workload_ids"]
+
+        return False
+
+
+    def _apply_addon_view_filtering(self, view, view_conf, views, arch):
+        """
+        Apply comprehensive build dependency filtering for addon views (Option B).
+
+        Removes packages that are only present due to base view requirements,
+        including complex build dependency scenarios.
+
+        Args:
+            view: The addon view data being processed
+            view_conf: Configuration of the addon view
+            views: All analyzed views (for base view lookup)
+            arch: Architecture being processed
+        """
+        base_view_conf_id = view_conf["base_view_id"]
+        log("  Applying comprehensive addon view filtering (Option B)...")
+        log("    Base view: {}".format(base_view_conf_id))
+
+        # Track packages to remove
+        packages_to_remove = []
+
+        for pkg_id, pkg in view["pkgs"].items():
+            should_include = self._should_include_package_in_addon_view(pkg)
+
+            if not should_include:
+                packages_to_remove.append(pkg_id)
+
+        # Remove filtered packages
+        log("    Filtering out {} packages that are only from base view".format(len(packages_to_remove)))
+        for pkg_id in packages_to_remove:
+            del view["pkgs"][pkg_id]
+
+
+    def _should_include_package_in_addon_view(self, pkg):
+        """
+        Determine if a package should be included in an addon view based on its origins.
+
+        A package is included if it has ANY addon view justification:
+        - Required by addon view workloads
+        - Dependency of addon view workloads
+        - Build dependency for addon view packages
+
+        Args:
+            pkg: Package data with tracking fields
+
+        Returns:
+            bool: True if package should be included, False if it should be filtered
+        """
+        # Check for addon view runtime justifications
+        has_addon_runtime = (
+            pkg.get("in_addon_view_workload_ids_req", set()) or
+            pkg.get("in_addon_view_workload_ids_dep", set())
+        )
+
+        # Check for addon view build dependency justifications
+        has_addon_buildroot = pkg.get("in_buildroot_of_addon_view_srpm_ids", set())
+
+        # Include if package has ANY addon view justification
+        return bool(has_addon_runtime or has_addon_buildroot)
 
 
     def _analyze_view(self, view_conf, arch, views):
@@ -1677,6 +1781,9 @@ class Analyzer():
             workload_conf_id = workload["workload_conf_id"]
             workload_conf = self.configs["workloads"][workload_conf_id]
 
+            # Determine if this workload comes from base view (for addon views)
+            is_base_view_workload = self._is_workload_from_base_view(workload_id, view_conf, views)
+
             # Packages in the environment
             for pkg_id in workload["pkg_env_ids"]:
 
@@ -1684,18 +1791,34 @@ class Analyzer():
                 if pkg_id not in view["pkgs"]:
                     pkg = self.data["pkgs"][repo_id][arch][pkg_id]
                     view["pkgs"][pkg_id] = self._init_view_pkg(pkg, arch)
-                
+
                 # It's in this wokrload
                 view["pkgs"][pkg_id]["in_workload_ids_all"].add(workload_id)
 
                 # And in the environment
                 view["pkgs"][pkg_id]["in_workload_ids_env"].add(workload_id)
 
+                # Enhanced view-aware tracking for environment packages
+                if is_base_view_workload:
+                    view["pkgs"][pkg_id]["in_base_view_workload_ids_dep"].add(workload_id)
+                else:
+                    view["pkgs"][pkg_id]["in_addon_view_workload_ids_dep"].add(workload_id)
+
                 # Is it also required?
+                is_required = False
                 if view["pkgs"][pkg_id]["name"] in workload_conf["packages"]:
                     view["pkgs"][pkg_id]["in_workload_ids_req"].add(workload_id)
+                    is_required = True
                 elif view["pkgs"][pkg_id]["name"] in workload_conf["arch_packages"][arch]:
                     view["pkgs"][pkg_id]["in_workload_ids_req"].add(workload_id)
+                    is_required = True
+
+                # Enhanced view-aware tracking for required packages
+                if is_required:
+                    if is_base_view_workload:
+                        view["pkgs"][pkg_id]["in_base_view_workload_ids_req"].add(workload_id)
+                    else:
+                        view["pkgs"][pkg_id]["in_addon_view_workload_ids_req"].add(workload_id)
                 
                 # pkg_relations
                 view["pkgs"][pkg_id]["required_by"].update(workload["pkg_relations"][pkg_id]["required_by"])
@@ -1710,19 +1833,32 @@ class Analyzer():
                 if pkg_id not in view["pkgs"]:
                     pkg = self.data["pkgs"][repo_id][arch][pkg_id]
                     view["pkgs"][pkg_id] = self._init_view_pkg(pkg, arch)
-                
+
                 # It's in this wokrload
                 view["pkgs"][pkg_id]["in_workload_ids_all"].add(workload_id)
 
                 # Is it required?
+                is_required = False
                 if view["pkgs"][pkg_id]["name"] in workload_conf["packages"]:
                     view["pkgs"][pkg_id]["in_workload_ids_req"].add(workload_id)
+                    is_required = True
                 elif view["pkgs"][pkg_id]["name"] in workload_conf["arch_packages"][arch]:
                     view["pkgs"][pkg_id]["in_workload_ids_req"].add(workload_id)
-                
-                # Or a dependency?
+                    is_required = True
+
+                # Enhanced view-aware tracking for required/dependency packages
+                if is_required:
+                    if is_base_view_workload:
+                        view["pkgs"][pkg_id]["in_base_view_workload_ids_req"].add(workload_id)
+                    else:
+                        view["pkgs"][pkg_id]["in_addon_view_workload_ids_req"].add(workload_id)
                 else:
+                    # Or a dependency?
                     view["pkgs"][pkg_id]["in_workload_ids_dep"].add(workload_id)
+                    if is_base_view_workload:
+                        view["pkgs"][pkg_id]["in_base_view_workload_ids_dep"].add(workload_id)
+                    else:
+                        view["pkgs"][pkg_id]["in_addon_view_workload_ids_dep"].add(workload_id)
                 
                 # pkg_relations
                 view["pkgs"][pkg_id]["required_by"].update(workload["pkg_relations"][pkg_id]["required_by"])
@@ -1759,18 +1895,9 @@ class Analyzer():
                 # Build requires
                 view["source_pkgs"][srpm_id]["placeholder_directly_required_pkg_names"] = workload_conf["package_placeholders"]["srpms"][srpm_name]["buildrequires"]
         
-        # If this is an addon view, remove all packages that are already in the parent view
+        # If this is an addon view, apply comprehensive build dependency filtering (Option B)
         if view_conf["type"] == "addon":
-            base_view_conf_id = view_conf["base_view_id"]
-
-            base_view_id = "{base_view_conf_id}:{arch}".format(
-                base_view_conf_id=base_view_conf_id,
-                arch=arch
-            )
-
-            for base_view_pkg_id in views[base_view_id]["pkgs"]:
-                if base_view_pkg_id in view["pkgs"]:
-                    del view["pkgs"][base_view_pkg_id]
+            self._apply_addon_view_filtering(view, view_conf, views, arch)
 
         # Done with packages!
         log("  Includes {} packages.".format(len(view["pkgs"])))
@@ -1789,6 +1916,14 @@ class Analyzer():
             view["source_pkgs"][srpm_id]["in_workload_ids_req"].update(pkg["in_workload_ids_req"])
             view["source_pkgs"][srpm_id]["in_workload_ids_dep"].update(pkg["in_workload_ids_dep"])
             view["source_pkgs"][srpm_id]["in_workload_ids_env"].update(pkg["in_workload_ids_env"])
+
+            # Update enhanced view-aware tracking for source packages
+            view["source_pkgs"][srpm_id]["in_base_view_workload_ids_req"].update(pkg.get("in_base_view_workload_ids_req", set()))
+            view["source_pkgs"][srpm_id]["in_base_view_workload_ids_dep"].update(pkg.get("in_base_view_workload_ids_dep", set()))
+            view["source_pkgs"][srpm_id]["in_addon_view_workload_ids_req"].update(pkg.get("in_addon_view_workload_ids_req", set()))
+            view["source_pkgs"][srpm_id]["in_addon_view_workload_ids_dep"].update(pkg.get("in_addon_view_workload_ids_dep", set()))
+            view["source_pkgs"][srpm_id]["in_buildroot_of_base_view_srpm_ids"].update(pkg.get("in_buildroot_of_base_view_srpm_ids", set()))
+            view["source_pkgs"][srpm_id]["in_buildroot_of_addon_view_srpm_ids"].update(pkg.get("in_buildroot_of_addon_view_srpm_ids", set()))
         
         log("  Includes {} source packages.".format(len(view["source_pkgs"])))
 
@@ -2376,6 +2511,22 @@ class Analyzer():
             for buildroot_srpm_id in srpm_ids_to_process:
                 buildroot_srpm = self.data["buildroot"]["srpms"][repo_id][arch][buildroot_srpm_id]
 
+                # Determine if this SRPM originates from base view or addon view
+                # Check the source package tracking in the view to see its origins
+                is_base_view_srpm = False
+                is_addon_view_srpm = False
+
+                if buildroot_srpm_id in view["source_pkgs"]:
+                    srpm_data = view["source_pkgs"][buildroot_srpm_id]
+                    # Check if SRPM has any base view workload connections
+                    if (srpm_data.get("in_base_view_workload_ids_req") or
+                        srpm_data.get("in_base_view_workload_ids_dep")):
+                        is_base_view_srpm = True
+                    # Check if SRPM has any addon view workload connections
+                    if (srpm_data.get("in_addon_view_workload_ids_req") or
+                        srpm_data.get("in_addon_view_workload_ids_dep")):
+                        is_addon_view_srpm = True
+
 
                 # Packages in the base buildroot (which would be the environment in workloads)
                 for pkg_id in buildroot_srpm["pkg_env_ids"]:
@@ -2396,6 +2547,12 @@ class Analyzer():
                     # And in the base buildroot specifically
                     view["pkgs"][pkg_id]["in_buildroot_of_srpm_id_env"].add(buildroot_srpm_id)
                     view["pkgs"][pkg_id]["level"][level]["env"].add(buildroot_srpm_id)
+
+                    # Enhanced view-aware build dependency tracking
+                    if is_base_view_srpm:
+                        view["pkgs"][pkg_id]["in_buildroot_of_base_view_srpm_ids"].add(buildroot_srpm_id)
+                    if is_addon_view_srpm:
+                        view["pkgs"][pkg_id]["in_buildroot_of_addon_view_srpm_ids"].add(buildroot_srpm_id)
 
                     # Is it also required?
                     if view["pkgs"][pkg_id]["name"] in buildroot_srpm["directly_required_pkg_names"]:
@@ -2424,11 +2581,17 @@ class Analyzer():
                     view["pkgs"][pkg_id]["in_buildroot_of_srpm_id_all"].add(buildroot_srpm_id)
                     view["pkgs"][pkg_id]["level"][level]["all"].add(buildroot_srpm_id)
 
+                    # Enhanced view-aware build dependency tracking
+                    if is_base_view_srpm:
+                        view["pkgs"][pkg_id]["in_buildroot_of_base_view_srpm_ids"].add(buildroot_srpm_id)
+                    if is_addon_view_srpm:
+                        view["pkgs"][pkg_id]["in_buildroot_of_addon_view_srpm_ids"].add(buildroot_srpm_id)
+
                     # Is it also required?
                     if view["pkgs"][pkg_id]["name"] in buildroot_srpm["directly_required_pkg_names"]:
                         view["pkgs"][pkg_id]["in_buildroot_of_srpm_id_req"].add(buildroot_srpm_id)
                         view["pkgs"][pkg_id]["level"][level]["req"].add(buildroot_srpm_id)
-                    
+
                     # Or a dependency?
                     else:
                         view["pkgs"][pkg_id]["in_buildroot_of_srpm_id_dep"].add(buildroot_srpm_id)
