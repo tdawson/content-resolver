@@ -6,6 +6,19 @@
 
 {% include "view_menu.html" %}
 
+{# Filter out base view source packages for addon views #}
+{% if view_conf.type == "addon" %}
+  {% set base_view_srpms = query.pkgs_in_view(view_conf.base_view_id, arch, output_change="source_names") %}
+  {% set filtered_source_pkgs = {} %}
+  {% for pkg_name, pkg in view_all_arches.source_pkgs_by_name.items() %}
+    {% if pkg_name not in base_view_srpms %}
+      {% set _ = filtered_source_pkgs.update({pkg_name: pkg}) %}
+    {% endif %}
+  {% endfor %}
+{% else %}
+  {% set filtered_source_pkgs = view_all_arches.source_pkgs_by_name %}
+{% endif %}
+
 
 
 <div id="loading">
@@ -41,7 +54,7 @@
         </tr>
     </thead>
     <tbody>
-        {% for pkg_name, pkg in view_all_arches.source_pkgs_by_name.items() %}
+        {% for pkg_name, pkg in filtered_source_pkgs.items() %}
         <tr>
             <td>
                 <a href="view-srpm--{{view_conf.id}}--{{pkg.name}}.html">{{pkg.name}}</a>

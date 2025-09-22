@@ -94,6 +94,13 @@ dependency
     </div>
     {% endif %}
 
+    {% if view_conf.type == "addon" %}
+    <div class="alert alert-info" role="alert">
+        <strong>Addon View:</strong> Packages from the base view <em>{{view_conf.base_view_id}}</em> are filtered out and not shown.
+        This view only displays packages that are unique to this addon.
+    </div>
+    {% endif %}
+
     <hr>
 
     {% block view_content %}{% endblock %}

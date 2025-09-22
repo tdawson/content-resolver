@@ -6,6 +6,19 @@
 
 {% include "view_menu.html" %}
 
+{# Filter out base view packages for addon views #}
+{% if view_conf.type == "addon" %}
+  {% set base_view_pkgs = query.pkgs_in_view(view_conf.base_view_id, arch, output_change="ids") %}
+  {% set filtered_pkgs = [] %}
+  {% for pkg in view_all_arches.pkgs_by_nevr.values() %}
+    {% if pkg.id not in base_view_pkgs %}
+      {% set _ = filtered_pkgs.append(pkg) %}
+    {% endif %}
+  {% endfor %}
+{% else %}
+  {% set filtered_pkgs = view_all_arches.pkgs_by_nevr.values() %}
+{% endif %}
+
 
 
 <div id="loading">
@@ -45,7 +58,7 @@
         </tr>
     </thead>
     <tbody>
-        {% for pkg in view_all_arches.pkgs_by_nevr.values() %}
+        {% for pkg in filtered_pkgs %}
         <tr>
             <td>
                 <a href="view-rpm--{{view_conf.id}}--{{pkg.name}}.html">{{pkg.name}}</a>

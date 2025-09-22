@@ -6,6 +6,33 @@
 
 {% include "view_menu.html" %}
 
+{# Calculate filtered counts for addon views #}
+{% if view_conf.type == "addon" %}
+  {% set base_view_pkgs = query.pkgs_in_view(view_conf.base_view_id, arch, output_change="ids") %}
+  {% set base_view_srpms = query.pkgs_in_view(view_conf.base_view_id, arch, output_change="source_names") %}
+
+  {# Filter packages #}
+  {% set filtered_pkgs = [] %}
+  {% set filtered_source_pkgs = {} %}
+  {% for pkg in view_all_arches.pkgs_by_nevr.values() %}
+    {% if pkg.id not in base_view_pkgs %}
+      {% set _ = filtered_pkgs.append(pkg) %}
+    {% endif %}
+  {% endfor %}
+  {% for pkg_name, pkg in view_all_arches.source_pkgs_by_name.items() %}
+    {% if pkg_name not in base_view_srpms %}
+      {% set _ = filtered_source_pkgs.update({pkg_name: pkg}) %}
+    {% endif %}
+  {% endfor %}
+
+  {# Calculate new counts #}
+  {% set addon_pkg_count = filtered_pkgs | length %}
+  {% set addon_srpm_count = filtered_source_pkgs | length %}
+{% else %}
+  {% set addon_pkg_count = view_all_arches.pkgs_by_nevr | count %}
+  {% set addon_srpm_count = view_all_arches.source_pkgs_by_name | count %}
+{% endif %}
+
 
 <div class="row">
     <div class="col-9">
@@ -27,10 +54,12 @@
                 <div class="card border-secondary">
                     <div class="card-body text-center">
 
-                        <h6>Total</h6>
-                        {{ view_all_arches.pkgs_by_nevr | count }} <small>RPMs - Binary Packages</small>
+                        <h6>Total{% if view_conf.type == "addon" %} (Addon Only){% endif %}</h6>
+                        {{ addon_pkg_count }} <small>RPMs - Binary Packages</small>
+                        {% if view_conf.type == "addon" %}<small class="text-muted">({{ view_all_arches.pkgs_by_nevr | count }} with base)</small>{% endif %}
                         <br>
-                        {{ view_all_arches.source_pkgs_by_name | count }} <small>SRPMs - Source Packages</small>
+                        {{ addon_srpm_count }} <small>SRPMs - Source Packages</small>
+                        {% if view_conf.type == "addon" %}<small class="text-muted">({{ view_all_arches.source_pkgs_by_name | count }} with base)</small>{% endif %}
                         {% if not view_all_arches.has_buildroot %}
                         <hr>
                         <div class="row">
