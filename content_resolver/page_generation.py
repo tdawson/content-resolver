@@ -397,6 +397,48 @@ def _generate_view_pages(query):
 
         # Common data
         view_all_arches = query.data["views_all_arches"][view_conf_id]
+
+        # For addon views, create a filtered version that excludes base view packages
+        if query.is_addon_view(view_conf_id):
+            log("  Creating addon-filtered data for page generation: {}".format(view_conf_id))
+
+            # Create filtered version of view_all_arches for templates
+            filtered_view_all_arches = view_all_arches.copy()
+
+            # Filter pkgs_by_nevr
+            filtered_pkgs_by_nevr = {}
+            for arch in view_conf["architectures"]:
+                addon_pkgs = query.addon_only_pkgs(view_conf_id, arch)
+                for pkg_id, pkg in addon_pkgs.items():
+                    if pkg_id not in filtered_pkgs_by_nevr:
+                        filtered_pkgs_by_nevr[pkg_id] = pkg
+
+            # Filter pkgs_by_name
+            filtered_pkgs_by_name = {}
+            for pkg_id, pkg in filtered_pkgs_by_nevr.items():
+                pkg_name = pkg["name"]
+                if pkg_name not in filtered_pkgs_by_name:
+                    filtered_pkgs_by_name[pkg_name] = pkg
+
+            # Filter source_pkgs_by_name
+            filtered_source_pkgs_by_name = {}
+            addon_source_names = set()
+            for arch in view_conf["architectures"]:
+                arch_source_names = query.addon_only_pkgs(view_conf_id, arch, output_change="source_names")
+                addon_source_names.update(arch_source_names)
+
+            for srpm_name in addon_source_names:
+                if srpm_name in view_all_arches["source_pkgs_by_name"]:
+                    filtered_source_pkgs_by_name[srpm_name] = view_all_arches["source_pkgs_by_name"][srpm_name]
+
+            # Update the filtered view data
+            filtered_view_all_arches["pkgs_by_nevr"] = filtered_pkgs_by_nevr
+            filtered_view_all_arches["pkgs_by_name"] = filtered_pkgs_by_name
+            filtered_view_all_arches["source_pkgs_by_name"] = filtered_source_pkgs_by_name
+
+            # Use the filtered data for addon views
+            view_all_arches = filtered_view_all_arches
+
         template_data = {
             "query": query,
             "view_conf": view_conf,

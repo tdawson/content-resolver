@@ -1181,3 +1181,115 @@ class Query():
     @lru_cache(maxsize = None)
     def view_srpm_name_details(self, srpm_name, view_conf_id):
         raise NotImplementedError
+
+
+    @lru_cache(maxsize = None)
+    def addon_only_pkgs(self, view_conf_id, arch, output_change=None, maintainer=None):
+        """
+        Get packages that are unique to this addon view (excluding base view packages).
+        For non-addon views, returns the same as pkgs_in_view().
+
+        Args:
+            view_conf_id: View configuration ID
+            arch: Architecture
+            output_change: Output format (same options as pkgs_in_view)
+            maintainer: Filter by maintainer
+
+        Returns:
+            For addon views: packages unique to the addon (base view packages filtered out)
+            For regular views: same as pkgs_in_view()
+        """
+        view_conf = self.configs["views"][view_conf_id]
+
+        # If not an addon view, just return regular view packages
+        if view_conf.get("type") != "addon":
+            return self.pkgs_in_view(view_conf_id, arch, output_change, maintainer)
+
+        # For addon views, filter out base view packages
+        base_view_id = view_conf["base_view_id"]
+
+        # Get all packages in this addon view
+        addon_pkgs = self.pkgs_in_view(view_conf_id, arch, output_change=None, maintainer=maintainer)
+
+        # Get base view package IDs to filter out
+        base_pkg_ids = self.pkgs_in_view(base_view_id, arch, output_change="ids", maintainer=None)
+        base_pkg_ids_set = set(base_pkg_ids)
+
+        # Filter out base packages
+        filtered_pkgs = {}
+        for pkg_id, pkg in addon_pkgs.items():
+            if pkg_id not in base_pkg_ids_set:
+                filtered_pkgs[pkg_id] = pkg
+
+        # Apply output transformation if requested
+        if output_change:
+            if output_change == "ids":
+                return sorted(list(filtered_pkgs.keys()))
+            elif output_change == "nevrs":
+                return sorted([pkg["name"] + "-" + pkg["evr"] for pkg in filtered_pkgs.values()])
+            elif output_change == "binary_names":
+                return sorted(list(set([pkg["name"] for pkg in filtered_pkgs.values()])))
+            elif output_change == "source_nvr":
+                return sorted(list(set([pkg["source_name"] + "-" + pkg["source_evr"] for pkg in filtered_pkgs.values()])))
+            elif output_change == "source_names":
+                return sorted(list(set([pkg["source_name"] for pkg in filtered_pkgs.values()])))
+
+        return filtered_pkgs
+
+
+    @lru_cache(maxsize = None)
+    def addon_only_buildroot_pkgs(self, view_conf_id, arch, output_change=None, maintainer=None):
+        """
+        Get buildroot packages that are unique to this addon view.
+        For non-addon views, returns the same as view_buildroot_pkgs().
+        """
+        view_conf = self.configs["views"][view_conf_id]
+
+        # If not an addon view, just return regular buildroot packages
+        if view_conf.get("type") != "addon":
+            return self.view_buildroot_pkgs(view_conf_id, arch, output_change, maintainer)
+
+        # For addon views, filter out base view buildroot packages
+        base_view_id = view_conf["base_view_id"]
+
+        # Get all buildroot packages in this addon view
+        addon_buildroot_pkgs = self.view_buildroot_pkgs(view_conf_id, arch, output_change=None, maintainer=maintainer)
+
+        # Get base view buildroot package IDs to filter out
+        base_buildroot_pkg_ids = self.view_buildroot_pkgs(base_view_id, arch, output_change="ids", maintainer=None)
+        base_buildroot_pkg_ids_set = set(base_buildroot_pkg_ids)
+
+        # Filter out base buildroot packages
+        filtered_pkgs = {}
+        for pkg_id, pkg in addon_buildroot_pkgs.items():
+            if pkg_id not in base_buildroot_pkg_ids_set:
+                filtered_pkgs[pkg_id] = pkg
+
+        # Apply output transformation if requested
+        if output_change:
+            if output_change == "ids":
+                return sorted(list(filtered_pkgs.keys()))
+            elif output_change == "nevrs":
+                return sorted([pkg["name"] + "-" + pkg["evr"] for pkg in filtered_pkgs.values()])
+            elif output_change == "binary_names":
+                return sorted(list(set([pkg["name"] for pkg in filtered_pkgs.values()])))
+            elif output_change == "source_nvr":
+                return sorted(list(set([pkg["source_name"] + "-" + pkg["source_evr"] for pkg in filtered_pkgs.values()])))
+            elif output_change == "source_names":
+                return sorted(list(set([pkg["source_name"] for pkg in filtered_pkgs.values()])))
+
+        return filtered_pkgs
+
+
+    def is_addon_view(self, view_conf_id):
+        """
+        Check if a view is an addon view.
+
+        Args:
+            view_conf_id: View configuration ID
+
+        Returns:
+            bool: True if the view is an addon view, False otherwise
+        """
+        view_conf = self.configs["views"][view_conf_id]
+        return view_conf.get("type") == "addon"
