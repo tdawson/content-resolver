@@ -24,6 +24,7 @@ class ConfigManager:
         parser.add_argument("--dev-buildroot", dest="dev_buildroot", action='store_true', help="Buildroot grows pretty quickly. Use a fake one for development.")
         parser.add_argument("--dnf-cache-dir", dest="dnf_cache_dir_override", help="Override the dnf cache_dir.")
         parser.add_argument("--parallel-max", dest="parallel_max", default=os.cpu_count(), type=int, help="Max parallel processes to run")
+        parser.add_argument("--views", dest="selected_views", nargs='*', help="Process only specified views (space-separated list). If not specified, all views are processed.")
         args = parser.parse_args()
 
         settings["configs"] = args.configs
@@ -32,6 +33,7 @@ class ConfigManager:
         settings["dev_buildroot"] = args.dev_buildroot
         settings["dnf_cache_dir_override"] = args.dnf_cache_dir_override
         settings["parallel_max"] = args.parallel_max
+        settings["selected_views"] = args.selected_views
 
         settings["root_log_deps_cache_path"] = "cache_root_log_deps.json"
 
@@ -1000,7 +1002,34 @@ class ConfigManager:
         log("  - {} buildroots".format(len(configs["buildroots"])))
         log("  - {} buildroot pkg relations JSONs".format(len(configs["buildroot_pkg_relations"])))
         log("")
-        
 
+        # Filter views if specific views were requested
+        selected_views = self.settings.get("selected_views")
+        if selected_views:
+            configs["views"] = self._filter_selected_views(configs["views"], selected_views)
+            log("Filtered views to process: {}".format(", ".join(configs["views"].keys())))
 
         return configs
+
+
+    def _filter_selected_views(self, views_dict, selected_views):
+        """Filter views dict to only include selected views and their dependencies"""
+        if not selected_views:
+            return views_dict
+
+        # Resolve dependencies - include base views for addon views
+        resolved_views = set(selected_views)
+        for view_id in selected_views:
+            view_conf = views_dict.get(view_id)
+            if view_conf and view_conf.get("type") == "addon":
+                base_view_id = view_conf.get("base_view_id")
+                if base_view_id and base_view_id in views_dict:
+                    resolved_views.add(base_view_id)
+
+        # Return filtered dictionary
+        filtered_views = {}
+        for view_id in resolved_views:
+            if view_id in views_dict:
+                filtered_views[view_id] = views_dict[view_id]
+
+        return filtered_views
