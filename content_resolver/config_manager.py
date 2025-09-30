@@ -24,6 +24,7 @@ class ConfigManager:
         parser.add_argument("--dev-buildroot", dest="dev_buildroot", action='store_true', help="Buildroot grows pretty quickly. Use a fake one for development.")
         parser.add_argument("--dnf-cache-dir", dest="dnf_cache_dir_override", help="Override the dnf cache_dir.")
         parser.add_argument("--parallel-max", dest="parallel_max", default=os.cpu_count(), type=int, help="Max parallel processes to run")
+        parser.add_argument("--views", dest="selected_views", nargs='*', help="Process only specified views (space-separated list). If not specified, all views are processed.")
         args = parser.parse_args()
 
         settings["configs"] = args.configs
@@ -32,6 +33,7 @@ class ConfigManager:
         settings["dev_buildroot"] = args.dev_buildroot
         settings["dnf_cache_dir_override"] = args.dnf_cache_dir_override
         settings["parallel_max"] = args.parallel_max
+        settings["selected_views"] = args.selected_views
 
         settings["root_log_deps_cache_path"] = "cache_root_log_deps.json"
 
@@ -42,6 +44,35 @@ class ConfigManager:
         settings["weird_packages_that_can_not_be_installed"] = ["glibc32"]
 
         return settings
+
+
+    def should_process_view(self, view_conf_id, configs):
+        """Determine if a view should be processed based on selection criteria"""
+        selected_views = self.settings.get("selected_views")
+
+        if not selected_views:  # No filter specified = process all
+            return True
+
+        # Resolve dependencies to include base views for addon views
+        resolved_views = self._resolve_view_dependencies(selected_views, configs)
+        return view_conf_id in resolved_views
+
+
+    def _resolve_view_dependencies(self, selected_views, configs):
+        """Ensure base views are included when addon views are selected"""
+        if not selected_views:
+            return []
+
+        resolved_views = set(selected_views)
+
+        for view_id in selected_views:
+            view_conf = configs["views"].get(view_id)
+            if view_conf and view_conf.get("type") == "addon":
+                base_view_id = view_conf.get("base_view_id")
+                if base_view_id:
+                    resolved_views.add(base_view_id)
+
+        return list(resolved_views)
 
 
 

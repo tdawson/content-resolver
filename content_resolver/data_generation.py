@@ -2,6 +2,35 @@ import os
 from content_resolver.utils import dump_data, log
 
 
+def _should_process_view(view_conf_id, query):
+    """Determine if a view should be processed based on selection criteria"""
+    selected_views = query.settings.get("selected_views")
+
+    if not selected_views:  # No filter specified = process all
+        return True
+
+    # Resolve dependencies to include base views for addon views
+    resolved_views = _resolve_view_dependencies(selected_views, query.configs)
+    return view_conf_id in resolved_views
+
+
+def _resolve_view_dependencies(selected_views, configs):
+    """Ensure base views are included when addon views are selected"""
+    if not selected_views:
+        return []
+
+    resolved_views = set(selected_views)
+
+    for view_id in selected_views:
+        view_conf = configs["views"].get(view_id)
+        if view_conf and view_conf.get("type") == "addon":
+            base_view_id = view_conf.get("base_view_id")
+            if base_view_id:
+                resolved_views.add(base_view_id)
+
+    return list(resolved_views)
+
+
 def _generate_json_file(data, page_name, settings):
     log("Generating the '{page_name}' JSON file...".format(
         page_name=page_name
@@ -42,6 +71,9 @@ def _generate_view_lists(query):
     log("Generating view lists...")
 
     for view_conf_id, view_conf in query.configs["views"].items():
+
+        if not _should_process_view(view_conf_id, query):
+            continue
 
         # all      RPM    NEVRAs      view-all-binary-package-list
         # all      RPM    NEVRs       view-all-binary-package-nevr-list
@@ -286,6 +318,10 @@ def _generate_view_json_files(query):
 
     log("Generating JSON files for views...")
     for view_conf_id, view_conf in query.configs["views"].items():
+
+        if not _should_process_view(view_conf_id, query):
+            continue
+
         view_all_arches = query.data["views_all_arches"][view_conf_id]
 
         # =================================================================

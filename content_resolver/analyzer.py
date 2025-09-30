@@ -371,6 +371,35 @@ class Analyzer():
             pass
 
 
+    def _should_process_view(self, view_conf_id):
+        """Determine if a view should be processed based on selection criteria"""
+        selected_views = self.settings.get("selected_views")
+
+        if not selected_views:  # No filter specified = process all
+            return True
+
+        # Resolve dependencies to include base views for addon views
+        resolved_views = self._resolve_view_dependencies(selected_views)
+        return view_conf_id in resolved_views
+
+
+    def _resolve_view_dependencies(self, selected_views):
+        """Ensure base views are included when addon views are selected"""
+        if not selected_views:
+            return []
+
+        resolved_views = set(selected_views)
+
+        for view_id in selected_views:
+            view_conf = self.configs["views"].get(view_id)
+            if view_conf and view_conf.get("type") == "addon":
+                base_view_id = view_conf.get("base_view_id")
+                if base_view_id:
+                    resolved_views.add(base_view_id)
+
+        return list(resolved_views)
+
+
     def _record_metric(self, name):
         this_record = {
             "name": name,
@@ -1807,6 +1836,9 @@ class Analyzer():
         for view_conf_id in self.configs["views"]:
             view_conf = self.configs["views"][view_conf_id]
 
+            if not self._should_process_view(view_conf_id):
+                continue
+
             if view_conf["type"] == "compose":
                 for arch in view_conf["architectures"]:
                     view = self._analyze_view(view_conf, arch, views)
@@ -1818,6 +1850,9 @@ class Analyzer():
         # This is important as they need the standard views already available
         for view_conf_id in self.configs["views"]:
             view_conf = self.configs["views"][view_conf_id]
+
+            if not self._should_process_view(view_conf_id):
+                continue
 
             if view_conf["type"] == "addon":
                 base_view_conf_id = view_conf["base_view_id"]
@@ -2279,6 +2314,9 @@ class Analyzer():
         for view_conf_id in self.configs["views"]:
             view_conf = self.configs["views"][view_conf_id]
 
+            if not self._should_process_view(view_conf_id):
+                continue
+
             if view_conf["type"] == "compose":
                 if view_conf["buildroot_strategy"] == "root_logs":
                     for arch in view_conf["architectures"]:
@@ -2486,6 +2524,9 @@ class Analyzer():
         # First, the standard views
         for view_conf_id in self.configs["views"]:
             view_conf = self.configs["views"][view_conf_id]
+
+            if not self._should_process_view(view_conf_id):
+                continue
 
             if view_conf["type"] == "compose":
                 if view_conf["buildroot_strategy"] == "root_logs":
@@ -2740,6 +2781,9 @@ class Analyzer():
         views_all_arches = {}
 
         for view_conf_id, view_conf in self.configs["views"].items():
+
+            if not self._should_process_view(view_conf_id):
+                continue
 
             #if view_conf["type"] == "compose":
             if True:
@@ -3070,6 +3114,9 @@ class Analyzer():
         for view_conf_id in self.configs["views"]:
             view_conf = self.configs["views"][view_conf_id]
 
+            if not self._should_process_view(view_conf_id):
+                continue
+
             if view_conf["type"] == "compose":
                 if view_conf["buildroot_strategy"] == "root_logs":
                     for arch in view_conf["architectures"]:
@@ -3113,6 +3160,10 @@ class Analyzer():
 
         for view_conf_id in self.configs["views"]:
             view_conf = self.configs["views"][view_conf_id]
+
+            if not self._should_process_view(view_conf_id):
+                continue
+
             view_all_arches = self.data["views_all_arches"][view_conf_id]
 
             # Skip addons for now
