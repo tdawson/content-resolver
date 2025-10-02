@@ -794,21 +794,17 @@ class ConfigManager:
         log("  Filtered to {} workloads (from {})".format(len(configs["workloads"]), len(configs.get("workloads", {}))))
 
         # Step 4: Filter environments - only those matching labels from workloads
-        needed_env_labels = set()
-        for workload_conf in configs["workloads"].values():
-            needed_env_labels.update(workload_conf.get("labels", []))
-
         filtered_envs = {}
         needed_repos_from_envs = set()
 
         for env_id, env_conf in configs["envs"].items():
             env_labels = set(env_conf.get("labels", []))
-            if env_labels & needed_env_labels:  # If any label matches
+            if env_labels & needed_labels:  # If any label matches
                 filtered_envs[env_id] = env_conf
                 needed_repos_from_envs.update(env_conf.get("repositories", []))
 
         configs["envs"] = filtered_envs
-        log("  Filtered to {} environments (from {})".format(len(configs["envs"]), len(configs.get("envs", {}))))
+        log("  Filtered to {} environments (from {}) {}".format(len(configs["envs"]), len(configs.get("envs", {})),  ", ".join(sorted(configs["envs"]))))
 
         # Step 5: Filter repositories - only those referenced by views or environments
         needed_repos = needed_repos_from_views | needed_repos_from_envs
@@ -819,21 +815,7 @@ class ConfigManager:
                 filtered_repos[repo_id] = repo_conf
 
         configs["repos"] = filtered_repos
-        log("  Filtered to {} repositories (from {})".format(len(configs["repos"]), len(configs.get("repos", {}))))
-
-        # Step 6: Filter labels - only those actually used
-        all_needed_labels = needed_labels | needed_env_labels
-
-        filtered_labels = {}
-        for label_id, label_conf in configs["labels"].items():
-            if label_id in all_needed_labels:
-                filtered_labels[label_id] = label_conf
-
-        configs["labels"] = filtered_labels
-        log("  Filtered to {} labels (from {})".format(len(configs["labels"]), len(configs.get("labels", {}))))
-
-        # Note: We keep unwanteds and buildroots unfiltered as they may be referenced
-        # by the selected views
+        log("  Filtered to {} repositories (from {}) {}".format(len(configs["repos"]), len(configs.get("repos", {})),  ", ".join(sorted(configs["repos"]))))
 
         log("")
         log("Config filtering complete!")
@@ -1103,6 +1085,23 @@ class ConfigManager:
         log("")
         log("  Done!")
         log("")
+        log("")
+
+        log("Summary Before Filtering:")
+        log("--------")
+        log("")
+
+        log("Standard yaml configs:")
+        log("  - {} repositories".format(len(configs["repos"])))
+        log("  - {} environments".format(len(configs["envs"])))
+        log("  - {} workloads".format(len(configs["workloads"])))
+        #log("  - {} labels".format(len(configs["labels"])))
+        log("  - {} views".format(len(configs["views"])))
+        log("  - {} exclusion lists".format(len(configs["unwanteds"])))
+        log("")
+        log("Additional configs: (soon to be deprecated)")
+        log("  - {} buildroots".format(len(configs["buildroots"])))
+        log("  - {} buildroot pkg relations JSONs".format(len(configs["buildroot_pkg_relations"])))
         log("")
 
         # Step 3: Filter configs if --views was specified
