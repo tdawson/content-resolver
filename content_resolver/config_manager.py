@@ -1082,43 +1082,28 @@ class ConfigManager:
         log("")
         log("")
 
-        log("Summary Before Filtering:")
-        log("--------")
-        log("")
-
-        log("Standard yaml configs:")
-        log("  - {} repositories".format(len(configs["repos"])))
-        log("  - {} environments".format(len(configs["envs"])))
-        log("  - {} workloads".format(len(configs["workloads"])))
-        #log("  - {} labels".format(len(configs["labels"])))
-        log("  - {} views".format(len(configs["views"])))
-        log("  - {} exclusion lists".format(len(configs["unwanteds"])))
-        log("")
-        log("Additional configs: (soon to be deprecated)")
-        log("  - {} buildroots".format(len(configs["buildroots"])))
-        log("  - {} buildroot pkg relations JSONs".format(len(configs["buildroot_pkg_relations"])))
-        log("")
-
         # Step 3: Filter configs if --labels was specified
         if self.settings.get("selected_labels"):
+            log("Summary Before Filtering:")
+            log("--------")
+            log("")
+            log("  - {} views".format(len(configs["views"])))
+            log("  - {} repositories".format(len(configs["repos"])))
+            log("  - {} environments".format(len(configs["envs"])))
+            log("  - {} workloads".format(len(configs["workloads"])))
+            log("  - {} exclusion lists".format(len(configs["unwanteds"])))
+            log("")
             selected_label_ids = [v.strip() for v in self.settings["selected_labels"].split(",")]
             configs = self.filter_configs_by_labels(configs, selected_label_ids)
 
         log("Summary:")
         log("--------")
         log("")
-
-        log("Standard yaml configs:")
+        log("  - {} views".format(len(configs["views"])))
         log("  - {} repositories".format(len(configs["repos"])))
         log("  - {} environments".format(len(configs["envs"])))
         log("  - {} workloads".format(len(configs["workloads"])))
-        #log("  - {} labels".format(len(configs["labels"])))
-        log("  - {} views".format(len(configs["views"])))
         log("  - {} exclusion lists".format(len(configs["unwanteds"])))
-        log("")
-        log("Additional configs: (soon to be deprecated)")
-        log("  - {} buildroots".format(len(configs["buildroots"])))
-        log("  - {} buildroot pkg relations JSONs".format(len(configs["buildroot_pkg_relations"])))
         log("")
 
 
