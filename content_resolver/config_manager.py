@@ -746,11 +746,6 @@ class ConfigManager:
 
         needed_labels = set(selected_label_ids)
 
-        # Validate that selected labels exist
-        for label_id in selected_label_ids:
-            if label_id not in configs["labels"]:
-                err_log("Warning: Selected label '{}' not found in configs. Continuing anyway.".format(label_id))
-
         # Step 1: Filter workloads - only those matching selected labels
         filtered_workloads = {}
         for workload_id, workload_conf in configs["workloads"].items():
